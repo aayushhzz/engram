@@ -1,0 +1,20 @@
+{
+  "sources": [
+    {
+      "name": "obsidian",
+      "type": "folder",
+      "path": "~/Documents/Obsidian Vault",
+      "exclude": [".obsidian", ".omx", ".trash", ".git"]
+    },
+    {
+      "name": "claude-chats",
+      "type": "claude_chats",
+      "days": 0
+    },
+    {
+      "name": "github",
+      "type": "github",
+      "max_repos": 200
+    }
+  ]
+}

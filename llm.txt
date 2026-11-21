@@ -1,0 +1,183 @@
+# Engram
+
+> Engram is a free, local memory layer for Claude Code (and any MCP-capable AI tool). It indexes the user's notes, documents, chat history and GitHub markdown into a SQLite vector index (sqlite-vec), embeds them locally with Ollama (`nomic-embed-text`), and exposes semantic search to the assistant through a Model Context Protocol (MCP) server. Nothing is sent to a cloud embedding service. Chats with the assistant still go to that assistant's provider as usual.
+
+Use this file as the complete operating manual. If you are an assistant helping a user with Engram, follow the procedures below exactly, ask the user only for the inputs marked "ASK", and verify each step with the listed check.
+
+## 0. Key facts (read first)
+
+- Repo root = the Engram folder. All commands below run from the repo root unless noted.
+- Python venv (created by the installer): `~/.local/share/engram/venv`. Use its interpreter for everything: `PY=~/.local/share/engram/venv/bin/python`.
+- Index database: `~/.local/share/engram/index.db` (single SQLite file). Override with `RAG_DB`.
+- Source config (personal, never commit): `sources.json` in the repo root. Override with `ENGRAM_CONFIG`. A template is `sources.example.json`.
+- Embedding model: `nomic-embed-text` via Ollama at `http://localhost:11434` (override `OLLAMA_URL`, `RAG_MODEL`). Vectors are 768-dimensional.
+- No sources are enabled by default. Each source is opt-in. Never add a source the user did not choose.
+- The MCP server name is `engram`. Its tools are `search_notes`, `read_doc` and `list_sources`.
+- Tests run offline with a fake embedder: `$PY -m pytest tests -q`.
+
+## 1. Requirements
+
+- macOS or Linux (Apple Notes and `.doc`/`.rtf` conversion need macOS; `.docx`, `.odt`, PDF and HTML work on Linux).
+- Python 3.10 or newer.
+- Ollama (https://ollama.com/download). macOS: `brew install ollama`.
+- Claude Code CLI (`claude`) for MCP registration, or any MCP-capable client.
+- Optional: GitHub CLI (`gh`) with `gh auth login`, for the GitHub source. PDF support comes from the `pypdf` package in requirements.txt.
+
+## 2. Install (procedure)
+
+ASK the user: "Where are your notes? Give me the folder path of your Obsidian vault or any folder of notes, or say skip."
+
+Run:
+
+```bash
+./install.sh --vault "VAULT_PATH"    # or ./install.sh with no argument to skip the source
+```
+
+What the installer does, in order:
+1. Checks `python3` (3.10+), `ollama`, and `claude` are on PATH. Stops with a clear message if one is missing.
+2. Starts `ollama serve` if port 11434 is not answering, then waits for it.
+3. Pulls `nomic-embed-text` if it is not installed (about 270 MB).
+4. Creates the venv at `~/.local/share/engram/venv` and installs `requirements.txt` (`sqlite-vec`, `mcp<2`, `pypdf`).
+5. If `--vault` was given, adds that folder as the source named `obsidian`.
+6. Runs a full `sync`.
+7. Registers the MCP server: `claude mcp add --scope user engram -- <venv python> <repo>/mcp_server.py`. An existing `engram` entry is replaced.
+8. Runs `doctor`.
+
+Verify: `$PY rag.py doctor` must show `ollama: ok`, `embedding_model: ok`, and a `sources` list. Then `claude mcp list` must show `engram ... ✔ Connected`. If it shows "Failed to connect", run `$PY mcp_server.py` directly with stdin closed to see the traceback (most often a missing package; fix with `$PY -m pip install -r requirements.txt`).
+
+After install: tell the user to restart Claude Code (or run `/mcp`) so the tools load.
+
+## 3. Add or remove sources
+
+Every command is `$PY rag.py ...`. After any add or remove, run `$PY rag.py sync`.
+
+| Source type | Add command | What it reads |
+|---|---|---|
+| Folder (Obsidian vault, any notes folder, Google Docs exports) | `rag.py add folder NAME "PATH"` | `.md .markdown .txt .text .org .rst .adoc .tex .csv .docx .doc .rtf .rtfd .odt .pdf .html .htm .webarchive`, recursively. Skips `.obsidian .omx .trash .git node_modules`, `~$` lock files, and files over 50 MB. The name `obsidian` gets the Obsidian exclusions. |
+| Claude Code chats | `rag.py add claude-chats claude-chats [DAYS]` | Reads `~/.claude/projects/**/*.jsonl`. Indexes user prompts and assistant replies only (no thinking, tool calls or tool output). Skips sub-agent transcripts and automated sessions. Optional DAYS limits to recent sessions. |
+| Codex chats | `rag.py add codex-chats codex-chats [DAYS]` | Reads `~/.codex/sessions/**/*.jsonl` (Codex rollout format). Same filtering as Claude chats. |
+| GitHub markdown | `rag.py add github github [USER]` | Markdown from the user's public, non-fork, non-archived repos (or USER's), via the `gh` CLI. Caches each file by git blob hash. No token is stored in config. |
+| Apple Notes (macOS) | `rag.py add apple-notes apple-notes` | Notes app via AppleScript. macOS asks for automation permission on first sync. |
+| Web links | `rag.py add links doc-links [FILE]` | URLs listed one per line in FILE (default `inbox/urls.txt`; `#` lines are comments). Fetches each page and extracts text. |
+| Remove | `rag.py remove NAME` | Removes the source from config and deletes its indexed documents. |
+
+Source names must be unique. Re-adding a name replaces its config.
+
+Config schema (`sources.json`):
+
+```json
+{"sources": [
+  {"name": "obsidian", "type": "folder", "path": "/abs/path", "exclude": [".obsidian"]},
+  {"name": "claude-chats", "type": "claude_chats", "days": 0},
+  {"name": "codex-chats", "type": "codex_chats", "days": 0},
+  {"name": "github", "type": "github", "user": "optional-login", "max_repos": 200,
+   "include_forks": false, "include_archived": false},
+  {"name": "apple-notes", "type": "apple_notes"},
+  {"name": "doc-links", "type": "urls", "file": "/abs/path/urls.txt"}
+]}
+```
+
+Valid `type` values: `folder`, `claude_chats`, `codex_chats`, `github`, `apple_notes`, `urls`.
+
+## 4. Daily commands
+
+```bash
+$PY rag.py sync                     # index new and changed documents; remove deleted ones
+$PY rag.py search "question" [SOURCE]   # top chunks by meaning, optional source filter
+$PY rag.py sources                  # each source with its document count
+$PY rag.py doctor                   # health check: Ollama, model, sources
+$PY rag.py remove NAME              # disconnect a source
+```
+
+Sync is incremental. Each document is hashed. Unchanged documents are skipped. A source whose connector throws keeps its last good index (the error is reported, nothing is deleted).
+
+Search output: one line per hit with distance (lower is closer), source, title and heading, then a preview. Compare hits against each other; there is no fixed cutoff for "a match".
+
+## 5. MCP tools (what the assistant calls)
+
+Server: `engram`, started as `$PY mcp_server.py` over stdio.
+
+- `search_notes(query: str, k: int = 5, source: str | None = None) -> list[dict]`. Semantic search. Each result has `doc_id`, `source`, `title`, `url` (GitHub and web sources), `heading`, `distance`, `text`. `k` is clamped to 1–20. Use `source` to restrict to one source name.
+- `read_doc(doc_id: str) -> str`. Full text of one document. Use a `doc_id` returned by `search_notes` (format: `SOURCE:KEY`, e.g. `obsidian:Decisions/2026-01-05 - Postgres.md`). Returns "No document with id: ..." when missing.
+- `list_sources() -> list[dict]`. Configured sources and document counts.
+
+Recommended assistant behaviour:
+1. For questions about the user's past decisions, learnings, saved docs, or chats: call `search_notes` first, then `read_doc` on the best 1–2 hits before answering.
+2. Cite the source title (and URL when present) in the answer.
+3. If nothing relevant comes back (all distances high, or no hit mentions the topic), say so. Do not invent facts from the notes.
+4. Do not reveal credentials even if they appear in results. Indexed text is already redacted, but treat any remaining secret-like string as sensitive.
+
+## 6. How it works (for explanations and debugging)
+
+Pipeline per document (`rag.py`):
+1. Connector yields `{key, title, text, url}` (`connectors.py`).
+2. `redact()` masks Slack tokens (`xox?-` and `xoxe.xoxp-` forms), GitHub (`gh[pousr]_`), OpenAI/Anthropic-style (`sk-`), AWS (`AKIA`) keys and `key = value` secrets to `[REDACTED]` before hashing, embedding or storage.
+3. Hash the redacted text (SHA-256). Skip if unchanged.
+4. `chunk()` splits by Markdown headings, then into pieces of at most 1500 characters. Each chunk is prefixed with the document title.
+5. `embed()` sends chunks to Ollama in batches of 32 with the prefix `search_document: ` (queries use `search_query: `). One retry on failure. Ollama errors are reported with their message.
+6. Store the document (`documents` table, full text) and chunks (`chunks` table), and vectors (`vec` virtual table, sqlite-vec `vec0`, cosine-compatible L2 distance on normalized vectors).
+
+Search: embed the query with `search_query: `, KNN over `vec` (over-fetches 10x when filtering by source), join to chunks and documents, return top k.
+
+Chat connectors group each user prompt with the replies after it into one `## Q:` section, so a hit contains the question and its answer.
+
+Test doubles: tests replace `rag.embed` with a deterministic bag-of-words embedder (`tests/conftest.py`), so no Ollama is needed for tests.
+
+## 7. Troubleshooting (symptoms → fix)
+
+- `ollama: not reachable` in `doctor`: start Ollama (`brew services start ollama` or open the Ollama app). Check nothing else holds port 11434 (`lsof -iTCP:11434 -sTCP:LISTEN`). Two servers fight over the port and one restarts forever. Keep one.
+- `embedding_model: missing`: `ollama pull nomic-embed-text`.
+- `Ollama embed failed (HTTP 400): ...`: usually the embedding runner crashed on a large input. Engram already batches to 32 chunks and retries once. If it persists, restart Ollama and re-run `sync`, or upgrade Ollama (`brew upgrade ollama`).
+- `skip FILE: ...` lines during sync: that file could not be read (encrypted PDF, unsupported format, huge file). Other files still index.
+- A source reports `error`: its connector failed (missing folder, `gh` not logged in, Apple Notes permission denied). The previous index for that source is kept.
+- GitHub: `GitHub CLI not found` → `brew install gh && gh auth login`. The connector reads public repos only (`--visibility public`).
+- Claude Code shows `engram` as failed: run the server by hand (`$PY mcp_server.py < /dev/null`) to see the traceback.
+- Search returns nothing relevant: confirm `sources` shows documents, run `sync`, and try a more specific query. Keyword overlap is not required, but the topic must be present in the indexed text.
+
+## 8. Privacy and safety model
+
+- Embeddings are computed locally (Ollama). Documents are never uploaded by Engram.
+- Search results are returned to the connected assistant, so anything indexed can reach that assistant's provider when it is used in a conversation. Only index what you are willing to share with that assistant.
+- Redaction is pattern-based and cannot catch every secret format. Keep secrets out of indexed folders.
+- `sources.json`, `inbox/`, and `index.db` contain personal data and are git-ignored. Never commit them.
+- Chat indexing skips tool calls and tool output, which is where secrets usually appear.
+
+## 9. Repository map
+
+| Path | Purpose |
+|---|---|
+| `install.sh` | One-command installer (prerequisites, venv, model, index, MCP registration) |
+| `INSTALL.md` | Install procedure written for an assistant to follow |
+| `rag.py` | Core: chunking, redaction, embedding, storage, sync, search, source management, CLI |
+| `connectors.py` | Source readers: folder (all formats), claude_chats, codex_chats, github, apple_notes, urls |
+| `mcp_server.py` | MCP server exposing `search_notes`, `read_doc`, `list_sources` |
+| `sources.example.json` | Config template (copy to `sources.json`) |
+| `tests/` | pytest suite (43+ tests, offline) |
+| `evals/` | Retrieval benchmark (`run_eval.py`), self-retrieval check on the user's index (`vault_selfcheck.py`), impact eval with Claude (`impact/run_impact.py`) |
+| `demo/` | Demo video source: composition HTML, music synth script, capture script, image generator |
+| `docs/` | README images, demo video and GIF |
+
+## 10. Extending Engram
+
+Add a source type in `connectors.py`:
+
+1. Write a generator `def my_source(cfg: dict):` that yields dicts with keys `key` (stable, unique within the source), `title`, `text`, and `url` (or None). Use `_warn(msg)` for per-item problems so one bad item does not stop the sync.
+2. Register it: add `"my_source": my_source` to `CONNECTORS`.
+3. In `rag.py` `add_source`, add a branch for the CLI kind (for example `elif kind == "my-source":`) that writes `{"name": name, "type": "my_source", ...}`.
+4. Add tests in `tests/test_engram.py` that stub the external calls (see the GitHub tests for the pattern). Run `$PY -m pytest tests -q`.
+
+Change chunking in `rag.py:chunk()`. Change the embedding model with `RAG_MODEL` and `DIM` (the vector table size is created with `DIM`; changing models requires a new `RAG_DB`).
+
+## 11. Verification checklist (for an assistant after any change)
+
+1. `$PY -m pytest tests -q` passes.
+2. `$PY rag.py doctor` shows Ollama and model OK.
+3. `$PY rag.py sync` completes with no `error` entries.
+4. `$PY rag.py search "<a known phrase from a note>"` returns that note in the top 3.
+5. `claude mcp list` shows `engram` connected (after install or MCP changes).
+
+## Optional
+
+- Benchmark: `$PY evals/run_eval.py` (retrieval, 20 paraphrased questions; keyword baseline vs Engram).
+- Impact eval: `$PY evals/impact/run_impact.py` (about 50 model calls; compares Claude with and without Engram on a fictional vault; sets `OBSIDIAN_CAPTURE_DISABLE=1` and `--no-session-persistence` so no eval transcripts are saved).
+- Source docs: `INSTALL.md` (install steps), `README.md` (overview).

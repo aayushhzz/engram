@@ -1,0 +1,283 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --paper:#F3EFE6; --ink:#14110F; --muted:#6B645C; --rule:rgba(20,17,15,.18); --accent:#E4572E; }
+  html,body { margin:0; height:100%; background:var(--paper); overflow:hidden; }
+  body { color:var(--ink); }
+  #stage { position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--paper); }
+  .scene { position:absolute; inset:0; display:none; }
+  .serif { font-family: "Iowan Old Style", Georgia, "Times New Roman", serif; }
+  .mono  { font-family: Menlo, "SF Mono", Consolas, monospace; }
+  .abs { position:absolute; white-space:nowrap; }
+  .label { font-size:22px; letter-spacing:4px; text-transform:uppercase; color:var(--muted); }
+  .frame-top { position:absolute; left:120px; right:120px; top:70px; display:flex; justify-content:space-between; border-bottom:1px solid var(--rule); padding-bottom:18px; }
+  .frame-top span { font-family: Menlo, monospace; font-size:20px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; }
+  .wipe { position:absolute; inset:0; background:var(--accent); transform-origin:left center; transform:scaleX(0); z-index:50; }
+  .prompt { left:160px; top:250px; width:1600px; height:120px; border:2px solid var(--ink); display:flex; align-items:center; padding:0 44px; font-size:52px; }
+  .prompt .glyph { color:var(--accent); margin-right:26px; }
+  .caret { display:inline-block; width:16px; height:50px; background:var(--ink); margin-left:6px; }
+  .row { left:160px; width:1600px; height:138px; border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:36px; padding:0 8px; }
+  .tag { font-family:Menlo,monospace; font-size:20px; letter-spacing:2px; padding:8px 14px; border:1.5px solid var(--ink); white-space:nowrap; }
+  .tag.hit { background:var(--accent); border-color:var(--accent); color:var(--paper); }
+  .row h3 { margin:0; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; font-size:44px; }
+  .row p { margin:6px 0 0; font-size:30px; color:var(--muted); }
+  .score { margin-left:auto; font-family:Menlo,monospace; font-size:24px; color:var(--muted); }
+  .card { width:360px; height:200px; border:1.5px solid var(--ink); padding:26px 28px; box-sizing:border-box; background:var(--paper); }
+  .card .k { font-family:Menlo,monospace; font-size:18px; letter-spacing:3px; color:var(--accent); text-transform:uppercase; }
+  .card .n { font-family:"Iowan Old Style",Georgia,serif; font-size:36px; margin-top:18px; line-height:1.15; white-space:normal; }
+  .bubble { position:absolute; width:900px; white-space:normal; padding:34px 40px; font-size:38px; line-height:1.4; }
+  .me { right:160px; top:300px; background:var(--ink); color:var(--paper); border-radius:26px 26px 6px 26px; }
+  .ai { left:160px; top:520px; border:2px solid var(--ink); border-radius:26px 26px 26px 6px; }
+  .src { position:absolute; left:160px; top:820px; font-family:Menlo,monospace; font-size:22px; color:var(--accent); letter-spacing:2px; }
+  .note { left:160px; top:300px; width:1600px; border:1.5px solid var(--ink); padding:50px 60px; font-family:Menlo,monospace; font-size:36px; line-height:1.8; }
+  .tok { position:relative; display:inline-block; }
+  .tok .old { color:var(--ink); }
+  .tok .red { position:absolute; left:0; top:0; background:var(--accent); color:var(--paper); padding:0 10px; opacity:0; }
+  .num { font-family:"Iowan Old Style",Georgia,serif; font-size:360px; line-height:1; letter-spacing:-10px; }
+  .caption { font-size:50px; color:var(--ink); }
+  .char { position:absolute; width:192px; height:320px; }
+  .char svg { width:100%; height:100%; display:block; shape-rendering:crispEdges; }
+  .pop { position:absolute; font-family:Menlo,monospace; font-size:40px; font-weight:700; color:var(--accent); }
+  .foot { left:0; right:0; text-align:center; bottom:90px; font-family:Menlo,monospace; font-size:24px; letter-spacing:4px; color:var(--muted); text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 1. Hook 0–2 s -->
+  <div class="scene" id="s1">
+    <div class="frame-top"><span>Engram / v0.1</span><span>local · free · open source</span></div>
+    <div class="abs serif" id="h1" style="left:160px; top:360px; font-size:200px; font-weight:600; letter-spacing:-5px;">Claude forgets.</div>
+    <div class="abs serif" id="h2" style="left:160px; top:570px; font-size:200px; font-style:italic; letter-spacing:-5px; color:var(--accent);">Engram doesn't.</div>
+  </div>
+
+  <!-- 2. Reveal 2–4.5 s -->
+  <div class="scene" id="s2">
+    <div class="frame-top"><span>Search by meaning</span><span>for Claude Code</span></div>
+    <div class="abs serif" id="logo" style="left:150px; top:330px; font-size:330px; font-weight:600; letter-spacing:-12px;">Engram</div>
+    <div class="abs" id="logosub" style="left:160px; top:790px; font-size:52px; color:var(--muted);">Your notes and past chats, findable by meaning.</div>
+    <div class="char" id="miner" style="left:1480px; top:400px;"></div>
+  </div>
+
+  <!-- 3. Search 4.5–10 s -->
+  <div class="scene" id="s3">
+    <div class="frame-top"><span>search_notes</span><span>one tool call</span></div>
+    <div class="abs prompt mono" id="prompt"><span class="glyph">&gt;</span><span id="qtext"></span><span class="caret" id="caret"></span></div>
+    <div class="abs row" id="r1" style="top:430px;"><span class="tag hit">OBSIDIAN</span><div><h3>Decision: move billing to Postgres</h3><p>Moved off MySQL for JSONB columns on invoice line items.</p></div><span class="score">0.74</span></div>
+    <div class="abs row" id="r2" style="top:578px;"><span class="tag">CLAUDE CHAT</span><div><h3>Schema review, March</h3><p>Partial indexes were the deciding factor.</p></div><span class="score">0.71</span></div>
+    <div class="abs row" id="r3" style="top:726px;"><span class="tag">GITHUB</span><div><h3>billing-service / docs/adr-004.md</h3><p>ADR: relational store for ledger data.</p></div><span class="score">0.66</span></div>
+  </div>
+
+  <!-- 4. Sources 10–14 s -->
+  <div class="scene" id="s4">
+    <div class="frame-top"><span>Sources</span><span>all optional</span></div>
+    <div class="abs serif" style="left:160px; top:200px; font-size:96px; font-weight:600; letter-spacing:-2px;">Your notes, wherever they live.</div>
+    <div class="abs card" id="c1" style="left:160px; top:400px;"><div class="k">Folder</div><div class="n">Obsidian &amp; markdown</div></div>
+    <div class="abs card" id="c2" style="left:570px; top:400px;"><div class="k">Documents</div><div class="n">Word, PDF, RTF</div></div>
+    <div class="abs card" id="c3" style="left:980px; top:400px;"><div class="k">Chats</div><div class="n">Claude &amp; Codex history</div></div>
+    <div class="abs card" id="c4" style="left:1390px; top:400px;"><div class="k">Code</div><div class="n">Your GitHub repos</div></div>
+    <div class="abs card" id="c5" style="left:160px; top:640px;"><div class="k">Apple</div><div class="n">Notes app</div></div>
+    <div class="abs card" id="c6" style="left:570px; top:640px;"><div class="k">Docs</div><div class="n">Google Docs export</div></div>
+    <div class="abs card" id="c7" style="left:980px; top:640px;"><div class="k">Web</div><div class="n">Links you save</div></div>
+    <div class="abs caption serif" id="cap4" style="left:1390px; top:700px; font-style:italic; color:var(--accent);">Pick what you want.</div>
+  </div>
+
+  <!-- 5. Memory in action 14–18 s -->
+  <div class="scene" id="s5">
+    <div class="frame-top"><span>Claude Code</span><span>with Engram</span></div>
+    <div class="abs bubble me mono" id="me5" style="font-size:34px;">how did we fix the OOM kills last time?</div>
+    <div class="abs bubble ai serif" id="ai5" style="left:430px; top:500px;"><span id="aitext"></span></div>
+    <div class="char" id="scribe5" style="left:120px; top:470px;"></div>
+    <div class="pop" id="hmm5" style="left:300px; top:440px;">hmm!</div>
+    <div class="src mono" id="src5">FROM YOUR CHAT · NOV 3 · search_notes</div>
+  </div>
+
+  <!-- 6. Privacy 18–22 s -->
+  <div class="scene" id="s6">
+    <div class="frame-top"><span>Before indexing</span><span>redaction</span></div>
+    <div class="abs note" id="note6" style="width:1260px;">
+      <div>deploy alerts use slack token</div>
+      <div><span class="tok"><span class="old" id="tokold">xoxb-4921-8810-K3m9pQw2xZ</span><span class="red" id="tokred">[REDACTED]</span></span></div>
+      <div>rotate it every quarter</div>
+    </div>
+    <div class="abs caption" id="cap6" style="left:160px; top:600px; font-size:54px;">Secrets are masked before anything is embedded.</div>
+    <div class="abs" id="cap6b" style="left:160px; top:690px; font-size:36px; color:var(--muted);">Embeddings and redaction run on your Mac.</div>
+    <div class="char" id="golem6" style="left:1560px; top:430px;"></div>
+  </div>
+
+  <!-- 7. Proof 22–26 s -->
+  <div class="scene" id="s7">
+    <div class="frame-top"><span>Impact eval</span><span>20 team-fact questions</span></div>
+    <div class="abs num" id="n1" style="left:160px; top:260px; color:var(--ink);">0<span style="font-size:120px; letter-spacing:0; color:var(--muted);">/20</span></div>
+    <div class="abs label" id="l1" style="left:170px; top:640px;">Claude alone</div>
+    <div class="abs num" id="n2" style="left:1000px; top:260px; color:var(--accent);">20<span style="font-size:120px; letter-spacing:0; color:var(--muted);">/20</span></div>
+    <div class="abs label" id="l2" style="left:1010px; top:640px;">Claude + Engram</div>
+    <div class="abs" id="cap7" style="left:160px; top:770px; font-size:34px; color:var(--muted);">Fictional notes, paraphrased questions. Your results will differ.</div>
+  </div>
+
+  <!-- 8. Outro 26–30 s -->
+  <div class="scene" id="s8">
+    <div class="frame-top"><span>Install</span><span>free · local · open source</span></div>
+    <div class="abs serif" id="o1" style="left:160px; top:300px; font-size:170px; font-weight:600; letter-spacing:-5px;">Engram.</div>
+    <div class="abs serif" id="o2" style="left:160px; top:500px; font-size:96px; font-style:italic; color:var(--accent);">Claude remembers now.</div>
+    <div class="abs mono" id="o3" style="left:160px; top:720px; font-size:40px; border:2px solid var(--ink); padding:22px 30px;">$ ./install.sh --vault ~/Notes</div>
+    <div class="char" id="miner8" style="left:1420px; top:460px;"></div>
+    <div class="char" id="scribe8" style="left:1640px; top:460px;"></div>
+  </div>
+
+</div>
+<div class="wipe" id="wipe"></div>
+
+<script>
+// Pure function of t (seconds). Beat = 0.5 s (120 BPM). Every cut is on a beat.
+const c = x => Math.min(1, Math.max(0, x));
+const ease = x => 1 - Math.pow(1 - c(x), 3);
+const P = (t, a, d) => c((t - a) / d);
+const $ = id => document.getElementById(id);
+const CUTS = [2, 4.5, 10, 14, 18, 22, 26]; // scene starts
+const SCENES = ["s1","s2","s3","s4","s5","s6","s7","s8"];
+const Q = "why did we switch databases for invoices?";
+const AI = "Set memory limits to JVM heap plus 25 percent. Pods were OOMKilled until we did.";
+const WIPE = 0.2; // seconds for each wipe
+
+function sceneAt(t) {
+  let idx = 0;
+  for (let i = 0; i < CUTS.length; i++) if (t >= CUTS[i]) idx = i + 1;
+  return idx;
+}
+function setOp(el, o, tf) { el.style.opacity = o; if (tf !== undefined) el.style.transform = tf; }
+
+function renderAt(t) {
+  const s = sceneAt(t);
+  SCENES.forEach((id, i) => $(id).style.display = (i === s) ? "block" : "none");
+
+  // Wipe: sweeps in before each cut, sweeps out after it (accent colour).
+  const w = $("wipe");
+  let scale = 0, origin = "left center";
+  for (const cut of CUTS) {
+    if (t >= cut - WIPE && t < cut) { scale = ease((t - (cut - WIPE)) / WIPE); origin = "left center"; }
+    if (t >= cut && t < cut + WIPE) { scale = 1 - ease((t - cut) / WIPE); origin = "right center"; }
+  }
+  w.style.transformOrigin = origin;
+  w.style.transform = `scaleX(${scale})`;
+
+  // 1. Hook
+  let p = P(t, 0.2, 0.5);
+  setOp($("h1"), ease(p), `translateX(${(1 - ease(p)) * -80}px)`);
+  p = P(t, 1.0, 0.5);
+  setOp($("h2"), ease(p), `translateX(${(1 - ease(p)) * 80}px)`);
+
+  // 2. Reveal
+  p = P(t, 2.2, 0.5);
+  setOp($("logo"), ease(p), `scale(${0.94 + 0.06 * ease(p)})`);
+  p = P(t, 2.8, 0.5);
+  setOp($("logosub"), ease(p), `translateY(${(1 - ease(p)) * 30}px)`);
+
+  // 3. Search (local time from 4.5)
+  const l3 = t - 4.5;
+  const n = Math.floor(c((l3 - 0.4) / 2.2) * Q.length);
+  $("qtext").textContent = Q.slice(0, n);
+  $("caret").style.opacity = (l3 < 3.0 && Math.floor(t * 2) % 2 === 0) ? 0 : (l3 >= 3.0 ? 0 : 1);
+  [["r1", 2.6], ["r2", 3.0], ["r3", 3.4]].forEach(([id, a]) => {
+    const q = P(l3, a, 0.4);
+    setOp($(id), ease(q), `translateY(${(1 - ease(q)) * 40}px)`);
+  });
+
+  // 4. Source cards (local from 10)
+  const l4 = t - 10;
+  ["c1","c2","c3","c4","c5","c6","c7"].forEach((id, i) => {
+    const q = P(l4, 0.3 + i * 0.25, 0.4);
+    setOp($(id), ease(q), `translateY(${(1 - ease(q)) * 36}px)`);
+  });
+  setOp($("cap4"), ease(P(l4, 2.4, 0.4)), "");
+
+  // 5. Memory bubbles (local from 14)
+  const l5 = t - 14;
+  setOp($("me5"), ease(P(l5, 0.3, 0.4)), `translateY(${(1 - ease(P(l5, 0.3, 0.4))) * 24}px)`);
+  const pa = P(l5, 1.2, 1.6);
+  $("aitext").textContent = AI.slice(0, Math.floor(pa * AI.length));
+  setOp($("ai5"), ease(P(l5, 1.0, 0.3)), "");
+  setOp($("src5"), ease(P(l5, 3.0, 0.4)), "");
+
+  // 6. Redaction (local from 18)
+  const l6 = t - 18;
+  setOp($("note6"), ease(P(l6, 0.2, 0.5)), "");
+  const redP = P(l6, 1.2, 0.35);
+  setOp($("tokred"), redP > 0 ? 1 : 0, "");
+  $("tokold").style.opacity = 1 - redP;
+  setOp($("cap6"), ease(P(l6, 2.0, 0.4)), "");
+  setOp($("cap6b"), ease(P(l6, 2.6, 0.4)), "");
+
+  // 7. Numbers (local from 22)
+  const l7 = t - 22;
+  const count = (k) => Math.round(k * ease(P(l7, 0.2, 1.1)));
+  $("n1").firstChild.textContent = String(count(0));
+  $("n2").firstChild.textContent = String(count(20));
+  setOp($("l1"), ease(P(l7, 0.6, 0.4)), "");
+  setOp($("l2"), ease(P(l7, 0.8, 0.4)), "");
+  setOp($("cap7"), ease(P(l7, 1.6, 0.5)), "");
+
+  // 8. Outro (local from 26)
+  const l8 = t - 26;
+  setOp($("o1"), ease(P(l8, 0.2, 0.5)), `translateY(${(1 - ease(P(l8, 0.2, 0.5))) * 30}px)`);
+  setOp($("o2"), ease(P(l8, 0.8, 0.5)), "");
+  setOp($("o3"), ease(P(l8, 1.6, 0.4)), "");
+}
+// Original blocky characters, drawn from rectangles (not copied from any game).
+const PAL = { skin:"#F1C9A5", ink:"#14110F", blue:"#2F6DB5", grey:"#4B4B4B", brown:"#7A4E2D", dark:"#3A2A1A" };
+function rects(list) {
+  return list.map(([x, y, w, h, f]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`).join("");
+}
+const FIG = {
+  miner: rects([
+    [3,2,6,5,PAL.skin], [2,0,8,3,"#F2C230"], [1,2,10,1,"#C9961C"],
+    [4,4,1,1,PAL.ink], [7,4,1,1,PAL.ink],
+    [3,7,6,6,PAL.blue], [1,7,2,5,PAL.blue], [9,7,2,5,PAL.blue],
+    [1,12,2,1,PAL.skin], [9,12,2,1,PAL.skin],
+    [3,11,6,1,PAL.dark], [3,13,2,5,PAL.grey], [7,13,2,5,PAL.grey],
+    [3,18,2,2,PAL.dark], [7,18,2,2,PAL.dark],
+    [11,5,1,9,PAL.brown], [9,4,4,1,"#9E9E9E"],
+  ]),
+  scribe: rects([
+    [3,2,6,5,"#E8D2B0"], [3,1,6,1,"#8A8A8A"], [3,2,1,2,"#8A8A8A"], [8,2,1,2,"#8A8A8A"],
+    [4,4,2,1,PAL.ink], [7,4,1,1,PAL.ink], [6,4,1,1,PAL.ink],
+    [2,7,8,8,"#E9E1C9"], [1,7,1,5,"#E9E1C9"], [10,7,1,5,"#E9E1C9"],
+    [2,10,8,1,PAL.brown], [1,14,10,1,PAL.brown],
+    [8,9,3,3,PAL.blue], [9,9,1,3,"#F4F4F4"],
+    [3,16,2,2,"#4A3A2A"], [7,16,2,2,"#4A3A2A"],
+  ]),
+  golem: rects([
+    [3,0,6,5,"#B9643A"], [4,2,1,1,"#FFD84D"], [7,2,1,1,"#FFD84D"],
+    [1,5,10,8,"#B9643A"], [4,7,1,3,"#7A3A1E"], [8,9,1,2,"#7A3A1E"],
+    [0,6,1,6,"#A3562F"], [11,6,1,6,"#A3562F"],
+    [2,13,3,4,"#A3562F"], [7,13,3,4,"#A3562F"],
+  ]),
+};
+function fillChar(id, key) {
+  const el = $(id);
+  el.innerHTML = `<svg viewBox="0 0 12 20" preserveAspectRatio="xMidYMax meet">${FIG[key]}</svg>`;
+}
+fillChar("miner", "miner"); fillChar("scribe5", "scribe"); fillChar("golem6", "golem");
+fillChar("miner8", "miner"); fillChar("scribe8", "scribe");
+
+function animateChars(t) {
+  const idle = (ph) => Math.sin(TAU * (t + ph) * 1.2) * 6;
+  const hop = (start) => { const x = t - start; return x >= 0 && x < 0.5 ? -Math.sin(Math.PI * x / 0.5) * 40 : 0; };
+  $("miner").style.transform = `translateY(${idle(0) + hop(2.6)}px)`;
+  $("scribe5").style.transform = `translateY(${idle(0.4) + hop(15.2) * 0.6}px)`;
+  $("golem6").style.transform = `translateY(${idle(0.8)}px)`;
+  $("miner8").style.transform = `translateY(${idle(0.2) + hop(26.6)}px)`;
+  $("scribe8").style.transform = `translateY(${idle(0.6) + hop(27.1)}px)`;
+  const hm = P(t, 15.2, 0.1) * (1 - P(t, 16.6, 0.5));
+  setOp($("hmm5"), hm, `translateY(${-P(t, 15.2, 0.6) * 20}px)`);
+}
+const TAU = 2 * Math.PI;
+const renderBase = renderAt;
+renderAt = function (t) { renderBase(t); animateChars(t); };
+window.renderAt = renderAt;
+renderAt(0);
+</script>
+</body>
+</html>

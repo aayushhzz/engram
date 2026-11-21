@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="370" viewBox="0 0 900 370">
+<style>.l{font:600 15px -apple-system,Helvetica,Arial;fill:#e6edf3} .v{font:13px -apple-system,Helvetica,Arial;fill:#c9d1d9} .b{font-weight:700;fill:#d2a8ff}</style>
+<rect width="900" height="370" rx="12" fill="#0d1117"/>
+<text x="30" y="40" style="font:700 20px -apple-system,Helvetica,Arial;fill:#ffffff">20 questions worded differently from the notes</text>
+<text x="30" y="78" class="l">Right note first</text>
+<rect x="30" y="90" width="330" height="24" rx="4" fill="#8b949e"/>
+<text x="370" y="107" class="v">55% keyword</text>
+<rect x="30" y="120" width="480" height="24" rx="4" fill="#a371f7"/>
+<text x="520" y="137" class="v b">80% Engram</text>
+<text x="30" y="168" class="l">Right note in top 3</text>
+<rect x="30" y="180" width="360" height="24" rx="4" fill="#8b949e"/>
+<text x="400" y="197" class="v">60% keyword</text>
+<rect x="30" y="210" width="570" height="24" rx="4" fill="#a371f7"/>
+<text x="610" y="227" class="v b">95% Engram</text>
+<text x="30" y="258" class="l">Mean reciprocal rank</text>
+<rect x="30" y="270" width="360" height="24" rx="4" fill="#8b949e"/>
+<text x="400" y="287" class="v">0.60 keyword</text>
+<rect x="30" y="300" width="528" height="24" rx="4" fill="#a371f7"/>
+<text x="568" y="317" class="v b">0.88 Engram</text>
+</svg>

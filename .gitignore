@@ -1,0 +1,19 @@
+# Personal configuration and data: never commit
+sources.json
+inbox/*
+!inbox/.gitkeep
+brag-output/
+
+# Generated artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.db-journal
+*.log
+venv/
+.venv/
+.DS_Store
+evals/impact/demo_vault/
+evals/impact/results.json
+demo/render/
